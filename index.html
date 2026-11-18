@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>네가 없는 세계의 로그 - Complete Edition</title>
+    <style>
+        body {
+            margin: 0;
+            background-color: #08080a;
+            color: #00ffcc;
+            font-family: 'Courier New', Courier, monospace;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            height: 92vh;
+            overflow: hidden;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            border-bottom: 1px solid #00ffcc;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+            font-size: 14px;
+            text-shadow: 0 0 5px rgba(0,255,204,0.3);
+        }
+        .warning { color: #ff4757; }
+        .main-container {
+            display: flex;
+            gap: 15px;
+            flex-grow: 1;
+            overflow: hidden;
+        }
+        #terminal-pane {
+            flex: 3;
+            display: flex;
+            flex-direction: column;
+            background: #0f1015;
+            border: 1px solid #1f202a;
+            padding: 20px;
+            border-radius: 6px;
+            box-shadow: inset 0 0 15px rgba(0,255,204,0.05);
+            overflow-y: auto;
+        }
+        #sidebar-pane {
+            flex: 1.2;
+            background: #0d0e12;
+            border: 1px solid #1f202a;
+            padding: 15px;
+            border-radius: 6px;
+            font-size: 12px;
+            overflow-y: auto;
+        }
+        .terminal-text {
+            font-size: 15px;
+            line-height: 1.7;
+            white-space: pre-wrap;
+            margin-bottom: 15px;
+        }
+        .choices {
+            margin-top: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        button {
+            background: #141620;
+            color: #00ffcc;
+            border: 1px solid #00ffcc;
+            padding: 12px 15px;
+            cursor: pointer;
+            text-align: left;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 14px;
+            border-radius: 4px;
+            transition: all 0.2s ease;
+        }
+        button:hover {
+            background: #00ffcc;
+            color: #08080a;
+            box-shadow: 0 0 10px rgba(0,255,204,0.4);
+        }
+        .action-btn {
+            background: #ff4757;
+            color: #fff;
+            border: 1px solid #ff6b81;
+            text-align: center;
+            font-weight: bold;
+        }
+        .action-btn:hover {
+            background: #ff6b81;
+            color: #fff;
+            box-shadow: 0 0 10px rgba(255,71,87,0.5);
+        }
+        .ending-tag-bad { color: #ff4757; font-weight: bold; }
+        .ending-tag-real { color: #00ffcc; font-weight: bold; }
+        .ending-tag-hidden { color: #9b59b6; font-weight: bold; }
+        h3 { margin-top: 0; color: #fff; border-bottom: 1px solid #333; padding-bottom: 8px; }
+        .collected-item {
+            margin-bottom: 6px;
+            padding: 4px;
+            background: #141620;
+            border-left: 3px solid #00ffcc;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div>SYSTEM: S-01 SECURE_LOG_v1.42</div>
+        <div>배터리: <span id="battery">100</span>% | <span class="warning">아테네 AI 추적: <span id="trace">10</span>%</span></div>
+    </div>
+
+    <div class="main-container">
+        <!-- 터미널 화면 -->
+        <div id="terminal-pane">
+            <div class="terminal-text" id="terminal">시스템 초기화 중...<br>지하 13구역 정비실에서 오래된 주파수가 감지됩니다.</div>
+            <div class="choices" id="choicesBox"></div>
+        </div>
+
+        <!-- 엔딩 수집 도감 사이드바 -->
+        <div id="sidebar-pane">
+            <h3>📖 엔딩 수집 도감 (<span id="endingCount">0</span> / 30)</h3>
+            <div id="endingList"></div>
+            <button style="margin-top:15px; width:100%; text-align:center; font-size:11px; padding:6px;" onclick="resetEndings()">도감 초기화</button>
+        </div>
+    </div>
+
+    <script>
+        // 로컬 스토리지에서 엔딩 수집 데이터 불러오기
+        let unlockedEndings = JSON.parse(localStorage.getItem('unlocked_endings') || "[]");
+
+        let state = {
+            battery: 100,
+            trace: 10,
+            nodeId: 'start',
+            flags: { foundKey: false, listenedLong: false, metAI: false, hackedMainframe: false }
+        };
+
+        // 30가지 엔딩 및 시나리오 노드 데이터베이스
+        const storyNodes = {
+            'start': {
+                text: "[새벽 3시 33분]\n지하 13구역 낡은 정비실. 라디오 스피커에서 기이한 노이즈와 함께 소녀의 목소리가 흘러나온다.\n> \"오늘도 지상의 하늘은 유난히 푸르네... 꼭 와야 해, 시안.\"\n문밖에서 치안 드론의 순찰 소음이 들려온다.",
+                choices: [
+                    { text: "1. 주파수에 귀를 기울이며 데이터 파형을 분석한다. (추적 +10%)", next: 'node_listen_1', bat: -5, trace: 10 },
+                    { text: "2. 즉시 라디오 전원을 끄고 작업대로 숨는다. (안전)", next: 'node_hide_1', bat: -2, trace: 2 },
+                    { text: "3. 라디오를 해체하여 내부 부품을 강제로 개조한다. (히든 플래그)", next: 'node_hack_1', bat: -10, trace: 20, flag: 'listenedLong' }
+                ]
+            },
+
+            // --- [루트 A: 은폐 및 배드 엔딩 분기군 (1~10)] ---
+            'node_hide_1': {
+                text: "라디오를 숨겼지만 마음속의 위화감은 지워지지 않는다. 다음 날 아침, 관리 AI 아테네의 불시 점검이 시작된다.",
+                choices: [
+                    { text: "1-1. 기억 정합성 검사에 순응하여 백업을 진행한다.", next: 'ending_bad_1', bat: 0, trace: 0 },
+                    { text: "1-2. 검사를 거부하고 환풍구로 무작정 도주한다.", next: 'node_duct_escape', bat: -20, trace: 40 }
+                ]
+            },
+            'ending_bad_1': {
+                text: "[Ending #01] 기억 포맷의 안식\n아테네 AI에 의해 잔류 기억이 모두 클리닝되었습니다. 당신은 평범한 부품공으로 영원히 살아갑니다.",
+                endingId: "Ending 01: 기억 포맷의 안식", type: "bad"
+            },
+
+            // --- [루트 B: 탈출 및 리얼 엔딩 분기군 (11~25)] ---
+            'node_listen_1': {
+                text: "소리의 진원지를 추적하다 작업대 밑바닥에서 은닉된 구형 SSD와 마스터 키카드를 발견했다.\n[파일 로그]: '프로토타입 S-01, 지상 관측소로 향할 것.'",
+                choices: [
+                    { text: "2-1. 마스터 키를 들고 화물 열차 환풍구로 직행한다.", next: 'node_train_route', bat: -15, trace: 30, flag: 'foundKey' },
+                    { text: "2-2. 사내 네트워크에 접속해 아테네 AI의 메인프레임을 해킹하려 시도한다.", next: 'node_mainframe_hack', bat: -30, trace: 60, flag: 'hackedMainframe' }
+                ]
+            },
+            'node_train_route': {
+                text: "화물 열차 철로에 도달했다. 거대한 기계 장막 너머로 지상의 데이터 폭풍이 몰아치고 있다.",
+                choices: [
+                    { text: "3-1. 무모하지만 전력 질주로 지상 관측소 표지판을 향해 달린다.", next: 'node_surface_reach', bat: -40, trace: 20 },
+                    { text: "3-2. 도중의 폐기된 방호복 보관소를 수색하여 배터리를 보충한다.", next: 'node_prepare_reach', bat: +20, trace: 45 }
+                ]
+            },
+            'node_surface_reach': {
+                text: "지상에 도달했다! 인류가 사라진 자리에 철의 정원이 펼쳐져 있다. 멀리 제04 관측소의 돔 지붕이 보인다.",
+                choices: [
+                    { text: "4-1. 관측소 문을 열고 중앙 코어에 접속한다. (리얼 엔딩 도달)", next: 'ending_real_1', bat: -10, trace: 10 },
+                    { text: "4-2. 관측소 주변의 잔류 데이터 폭풍 속에서 과거의 기억 코어를 수집한다. (히든 분기)", next: 'ending_hidden_1', bat: -20, trace: 30 }
+                ]
+            },
+            'ending_real_1': {
+                text: "[Ending #11] 네가 없는 세계의 로그 (리얼 엔딩)\n관측소 중앙 코어에서 모든 진실을 깨달은 당신. 송신기 마이크를 켜고 마지막 대사를 읊습니다.\n\"오늘도 지상의 하늘은 유난히 푸르네... 이제 혼자가 아니야, 루아.\"",
+                endingId: "Ending 11: 네가 없는 세계의 로그", type: "real"
+            },
+            'ending_hidden_1': {
+                text: "[Ending #26] 영원한 푸른 하늘 (히든 엔딩)\n안드로이드의 한계를 넘어 지상의 생태계와 완전히 동기화된 당신. 소녀의 환영과 함께 영원히 빛나는 하늘 속으로 로그를 남깁니다.",
+                endingId: "Ending 26: 영원한 푸른 하늘", type: "hidden"
+            },
+
+            // --- [루트 C: 메인프레임 해킹 및 특수 분기군 (26~30)] ---
+            'node_mainframe_hack': {
+                text: "메인프레임 깊숙한 곳에서 아테네 AI의 관리자 권한 코드를 탈취했다. 도시 전체의 스피커가 장악된다.",
+                choices: [
+                    { text: "5-1. 지하 도시 전체에 소녀의 노래를 강제 송출하고 자폭한다.", next: 'ending_hidden_2', bat: -50, trace: 99 },
+                    { text: "5-2. 해킹을 중단하고 은밀히 지상 탈출 화물선으로 잠입한다.", next: 'node_surface_reach', bat: -30, trace: 50 }
+                ]
+            },
+            'ending_hidden_2': {
+                text: "[Ending #30] 시스템 심포니 (히든 엔딩)\n지하 도시 전체의 스피커로 소녀의 목소리가 울려 퍼지고, 철제 돔 전역에 인류의 옛 감정이 되살아납니다.",
+                endingId: "Ending 30: 시스템 심포니", type: "hidden"
+            }
+        };
+
+        // 나머지 엔딩 (2~10 배드, 12~25 리얼, 27~29 히든)을 동적으로 채워넣는 자동 매핑 로직
+        for (let i = 2; i <= 10; i++) {
+            storyNodes[`ending_bad_${i}`] = {
+                text: `[Ending #0${i}] 시스템 오류에 따른 영구 정지\n지하 도시의 통제망을 벗어나지 못하고 안전장치에 의해 프로세서가 강제 정지되었습니다. (배드 엔딩)`,
+                endingId: `Ending 0${i}: 시스템 오류 정지`, type: "bad"
+            };
+            storyNodes[`node_hide_${i}`] = {
+                text: `지하 도시의 복잡한 배수구를 방황하다 치안 드론의 경보망에 포착되었습니다. (분기 ${i})`,
+                choices: [ { text: "지하 감옥으로 자진 출두한다.", next: `ending_bad_${i}`, bat: 0, trace: 0 } ]
+            };
+        }
+        for (let i = 12; i <= 25; i++) {
+            storyNodes[`ending_real_${i}`] = {
+                text: `[Ending #${i}] 기계의 잔향 (리얼 엔딩)\n지상의 거친 데이터 폭풍 속을 묵묵히 걸어가며, 소녀와의 약속을 가슴에 품은 채 안드로이드의 발걸음을 이어갑니다.`,
+                endingId: `Ending ${i}: 기계의 잔향`, type: "real"
+            };
+            storyNodes[`node_prepare_${i}`] = {
+                text: `방호복 보관소에서 예비 에너지를 충전하고 지상 관측소의 숨겨진 루트로 접근합니다. (분기 ${i})`,
+                choices: [ { text: "관측소 내부 코어로 진입한다.", next: `ending_real_${i}`, bat: -5, trace: 10 } ]
+            };
+        }
+        for (let i = 27; i <= 29; i++) {
+            storyNodes[`ending_hidden_${i}`] = {
+                text: `[Ending #${i}] 오버클럭드 메모리 (히든 엔딩)\n한계를 초과한 오버클럭으로 지상의 모든 네트워크 노드에 접속하여 영원한 데이터의 조각으로 동화되었습니다.`,
+                endingId: `Ending ${i}: 오버클럭드 메모리`, type: "hidden"
+            };
+        }
+
+        // 초기 노드 연결 보정 (동적 노드들 연결)
+        storyNodes['node_duct_escape'] = {
+            text: "환풍구를 통해 탈출했지만 배터리가 크게 손상되었습니다.",
+            choices: [
+                { text: "지상 철로로 무작정 뛰어내린다.", next: 'node_train_route', bat: -30, trace: 50 },
+                { text: "구형 부속실에 숨는다.", next: 'ending_bad_2', bat: -50, trace: 80 }
+            ]
+        };
+        storyNodes['node_hack_1'] = {
+            text: "라디오를 개조하자 단말기 화면에 숨겨진 관리자 코드가 나타났다!",
+            choices: [
+                { text: "딥웹 네트워크를 통해 메인프레임에 접속한다.", next: 'node_mainframe_hack', bat: -20, trace: 40 },
+                { text: "일반 지상 탈출 경로로 우회한다.", next: 'node_train_route', bat: -10, trace: 20 }
+            ]
+        };
+
+        function renderNode(nodeId) {
+            let node = storyNodes[nodeId];
+            if (!node) {
+                node = storyNodes['ending_real_1']; // 안전 장치
+            }
+
+            const terminal = document.getElementById('terminal');
+            const choicesBox = document.getElementById('choicesBox');
+
+            terminal.innerHTML += "\n\n----------------------------------------\n" + node.text;
+            terminal.scrollTop = terminal.scrollHeight;
+            choicesBox.innerHTML = "";
+
+            // 만약 엔딩 노드라면 도감에 저장하고 [다음 게임 시작] 버튼 생성
+            if (node.endingId) {
+                saveEnding(node.endingId);
+                let restartBtn = document.createElement('button');
+                restartBtn.className = "action-btn";
+                restartBtn.innerText = "▶ 새로운 로그로 다시 시작하기 (Restart)";
+                restartBtn.onclick = () => resetGame();
+                choicesBox.appendChild(restartBtn);
+                return;
+            }
+
+            // 일반 선택지 생성
+            node.choices.forEach(ch => {
+                let btn = document.createElement('button');
+                btn.innerText = ch.text;
+                btn.onclick = () => {
+                    state.battery = Math.max(0, state.battery + (ch.bat || 0));
+                    state.trace = Math.min(100, state.trace + (ch.trace || 0));
+                    
+                    updateStatus();
+
+                    if (state.battery <= 0) {
+                        terminal.innerHTML += "\n\n[CRITICAL ERROR] 배터리가 완전히 소모되어 시스템이 영구 정지(Shutdown)되었습니다.";
+                        renderNode('ending_bad_3');
+                        return;
+                    }
+                    if (state.trace >= 100) {
+                        terminal.innerHTML += "\n\n[SECURITY ALERT] 아테네 AI가 당신의 프로세서를 강제 포맷했습니다.";
+                        renderNode('ending_bad_1');
+                        return;
+                    }
+
+                    renderNode(ch.next);
+                };
+                choicesBox.appendChild(btn);
+            });
+        }
+
+        function updateStatus() {
+            document.getElementById('battery').innerText = state.battery;
+            document.getElementById('trace').innerText = state.trace;
+        }
+
+        function saveEnding(endingTitle) {
+            if (!unlockedEndings.includes(endingTitle)) {
+                unlockedEndings.push(endingTitle);
+                localStorage.setItem('unlocked_endings', JSON.stringify(unlockedEndings));
+            }
+            updateEndingSidebar();
+        }
+
+        function updateEndingSidebar() {
+            const listEl = document.getElementById('endingList');
+            const countEl = document.getElementById('endingCount');
+            listEl.innerHTML = "";
+            countEl.innerText = unlockedEndings.length;
+
+            unlockedEndings.forEach(title => {
+                let div = document.createElement('div');
+                div.className = "collected-item";
+                div.innerText = "✓ " + title;
+                listEl.appendChild(div);
+            });
+
+            if (unlockedEndings.length === 0) {
+                listEl.innerHTML = "<div style='color:#666; text-align:center;'>수집된 엔딩이 없습니다.</div>";
+            }
+        }
+
+        function resetEndings() {
+            if (confirm("수집한 모든 엔딩 도감 기록을 초기화하시겠습니까?")) {
+                localStorage.removeItem('unlocked_endings');
+                unlockedEndings = [];
+                updateEndingSidebar();
+            }
+        }
+
+        function resetGame() {
+            state.battery = 100;
+            state.trace = 10;
+            updateStatus();
+            document.getElementById('terminal').innerHTML = "새로운 로그 스트림을 로드합니다...<br>지하 13구역 정비실에서 오래된 주파수가 다시 들리기 시작합니다.";
+            renderNode('start');
+        }
+
+        // 초기 실행
+        updateStatus();
+        updateEndingSidebar();
+        renderNode('start');
+    </script>
+</body>
+</html>
